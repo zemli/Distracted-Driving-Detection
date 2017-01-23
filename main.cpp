@@ -8,8 +8,8 @@
 #include "../stasm/stasm_lib.h"
 #include "../stasm/stasm_landmarks.h"
 
-#include "../vc10/gazedir.h"
-#include "../vc10/drowsydet.h"
+#include "../VisualStudio/gazedir.h"
+#include "../VisualStudio/drowsydet.h"
 
 /*
 Global variables
@@ -18,6 +18,7 @@ static const char* path = "./img.jpg";
 cv::VideoCapture cap(0);
 int foundface;
 float landmarks[2 * stasm_NLANDMARKS];
+float landmarks0[2 * stasm_NLANDMARKS];
 
 //gaze degree
 float beta;
@@ -39,23 +40,54 @@ cv::Mat dst, detected_edges;
 function declared in main.cpp
 */
 void compute();
+void featuresMotion();
 void cropImg(cv::Mat_<unsigned char> frame);
 void cannyEdge(cv::Mat_<unsigned char> frame);
+void gaborFilter(cv::Mat_<unsigned char> cropped);
 
 
 /*
 function defined in main.cpp
 */
 void compute() {
-	lEyeLen = landmarks[30*2] - landmarks[34*2];
-	rEyeLen = landmarks[44*2] - landmarks[40*2];
-	faceLen = landmarks[6*2+1] - landmarks[14*2+1];
-	faceWid = landmarks[11*2] - landmarks[1*2];
+	lEyeLen = int(landmarks[30*2] - landmarks[34*2]);
+	rEyeLen = int(landmarks[44*2] - landmarks[40*2]);
+	faceLen = int(landmarks[6*2+1] - landmarks[14*2+1]);
+	faceWid = int(landmarks[11*2] - landmarks[1*2]);
+	
+}
+
+void featuresMotion(){
+	float eyeMiddleL = (landmarks[30*2+1] + landmarks[34*2+1])/2;
+	float eyeMiddleL0 = (landmarks0[30*2+1] + landmarks0[34*2+1])/2;
+	float eyeMiddleR = (landmarks[40*2+1] + landmarks[44*2+1])/2;
+	float eyeMiddleR0 = (landmarks0[40*2+1] + landmarks0[44*2+1])/2;
+
+	float innerBrow = ((landmarks[21*2+1] - eyeMiddleL + landmarks[22*2+1] - eyeMiddleR) - (landmarks0[21*2+1] - eyeMiddleL0 + landmarks0[22*2+1] - eyeMiddleR0)) / (landmarks0[21*2+1] - eyeMiddleL0 + landmarks0[22*2+1] - eyeMiddleR0);
+	float outerBrow = ((landmarks[18*2+1] - eyeMiddleL + landmarks[25*2+1] - eyeMiddleR) - (landmarks0[18*2+1] - eyeMiddleL0 + landmarks0[25*2+1] - eyeMiddleR0)) / (landmarks0[18*2+1] - eyeMiddleL0 + landmarks0[25*2+1] - eyeMiddleR0);
+	float browsDis = (landmarks[22*2] - landmarks[21*2]) - (landmarks0[22*2+1] - landmarks0[21*2+1]);
+	float eyeHeight = openRate;
+	float eyeTopLip = ((landmarks[32*2+1] - eyeMiddleL + landmarks[42*2+1] - eyeMiddleR) - (landmarks0[32*2+1] - eyeMiddleL0 + landmarks0[42*2+1] - eyeMiddleR0)) / (landmarks0[32*2+1] - eyeMiddleL0 + landmarks0[43*2+1] - eyeMiddleR0);
+	float eyeBottomLip = ((landmarks[36*2+1] - eyeMiddleL + landmarks[46*2+1] - eyeMiddleR) - (landmarks0[36*2+1] - eyeMiddleL0 + landmarks0[46*2+1] - eyeMiddleR0)) / (landmarks0[36*2+1] - eyeMiddleL0 + landmarks0[46*2+1] - eyeMiddleR0);
+
+	std::cout << "Upper face features: "<<innerBrow<< ", " <<outerBrow<< ", " <<browsDis<< ", " <<eyeHeight<< ", "<<eyeTopLip<< ", "<<eyeBottomLip << std::endl;
+
+	float lipMiddle = landmarks[59*2+1] + landmarks[65*2+1];
+	float lipMiddle0 = landmarks0[59*2+1] + landmarks0[65*2+1];
+
+	float lipH = (landmarks[62*2+1] + landmarks[74*2+1] - lipMiddle - (landmarks0[62*2+1] + landmarks0[74*2+1] - lipMiddle0))/(landmarks0[62*2+1] + landmarks0[74*2+1] - lipMiddle0);
+	float lipW = ((landmarks[65*2] - landmarks[59*2]) - (landmarks0[65*2] - landmarks0[59*2]))/(landmarks0[65*2] - landmarks0[59*2]);
+	float lipCornerL = ((landmarks[59*2] - lipMiddle) - (landmarks0[59*2] - lipMiddle0)) / (landmarks0[59*2] - lipMiddle0);
+	float lipCornerR = (landmarks[65*2] - lipMiddle) - (landmarks0[65*2] - lipMiddle0) / (landmarks0[65*2] - lipMiddle0);
+
+	std::cout << "Lower face features: "<<lipH<< ", " <<lipW<< ", " <<lipCornerL<< ", " <<lipCornerR <<std::endl;
+
+	std::copy(std::begin(landmarks),std::end(landmarks),std::begin(landmarks0));
 }
 
 void cropImg(cv::Mat_<unsigned char> frame) {
-	int adjust = lEyeLen/1.7;
-	cv::Rect myROI(landmarks[0] , landmarks[14*2+1] , faceWid + adjust, faceLen + adjust);
+	int adjust = lEyeLen;
+	cv::Rect myROI((int)landmarks[0] , (int)landmarks[14*2+1] , faceWid + adjust, faceLen + adjust);
 	// Copy the data into new matrix
 	frame(myROI).copyTo(cropped);
 	imshow( "cropped", cropped );
@@ -74,7 +106,7 @@ void drowsyDetect1() {
 
 	if(sumOpenRate / 60 < 0.79) {
 		drowsy();
-		std::cout << "====================================" << std::endl;
+		std::cout << "================Drowsy Driving Detected====================" << std::endl;
 	}
 }
 
@@ -91,7 +123,7 @@ void drowsyDetect2() {
 	if(closeNum == 60) {
 		closeNum--;
 		drowsy();
-		std::cout << "====================================" << std::endl;
+		std::cout << "================Drowsy Driving Detected====================" << std::endl;
 	}
 }
 
@@ -102,7 +134,7 @@ void cannyEdge(cv::Mat_<unsigned char> img){
 	cv::blur( img, detected_edges, cv::Size(2,2) );
 
 	/// Canny detector
-	cv::Canny( detected_edges, detected_edges, 20, 20*3, 3 );
+	cv::Canny( detected_edges, detected_edges, 25, 25*3, 3 );
 	//cv::Canny( frame, detected_edges, 22, 22*3, 3 );
 
 	/// Using Canny's output as a mask, we display our result
@@ -110,6 +142,22 @@ void cannyEdge(cv::Mat_<unsigned char> img){
 
 	img.copyTo( dst, detected_edges);
     imshow( "Edge Map", dst );
+}
+
+void gaborFilter(cv::Mat_<unsigned char> cropped){
+	int kernel_size = 3;
+    double sig = 5, theta = 100, th = 0, lm = 8, gm = 0.02, ps = 0;
+	cv::Mat kernel;
+    cv::Mat src, dest;
+	//src.convertTo(cropped,CV_32F, 1.0/255, 0);
+    kernel = cv::getGaborKernel(cv::Size(kernel_size,kernel_size), sig, theta, lm, gm, ps);
+	cv::filter2D(cropped, dest, CV_32F, kernel);
+	//std::cerr << dest(cv::Rect(30,30,10,10)) << std::endl; // peek into the data
+	imshow("k",kernel);
+//cv::Mat viz;
+//dest.convertTo(viz,CV_8U,1.0/255.0);     // move to proper[0..255] range to show it
+
+//imshow("d",viz);
 }
 
 int main(int argc, char** argv){
@@ -123,9 +171,10 @@ int main(int argc, char** argv){
 	}
 
 	std::cout<<"Reading Habits Monitor is working...";
-		while(true){
+	try{
+	while(true){
 
-        cap >> img; // get a new frame from camera
+		cap >> img; // get a new frame from camera
 		cv::cvtColor(img, frame, CV_BGR2GRAY);
 
 		if(!frame.data){
@@ -138,14 +187,17 @@ int main(int argc, char** argv){
 			return -1;
 		}
 
-        if (!foundface)
+		if (!foundface)
 			std::cout<<"=============== No face found !!!!!!! ==============="<<std::endl;
 
 		stasm_force_points_into_image(landmarks,frame.cols, frame.rows);
 		//for(int i = 0; i < stasm_NLANDMARKS; i++)
 		//	frame(cvRound(landmarks[i*2+1]), cvRound(landmarks[i*2])) = 255;
 
+		
 		compute();
+
+		featuresMotion();
 
 		/*=============================================== Gaze Direction ==============================================================*/
 		beta = betaAngle(
@@ -165,25 +217,33 @@ int main(int argc, char** argv){
 
 		EOR(beta);
 
-		std::cout << beta << std::endl;
+		//std::cout << beta << std::endl;
 		/*=============================================== Growsy Detection ==============================================================*/
 
 		drowsyDetect2();
 
-		/*=============================================== Canny Edge Detection ==============================================================*/
+		/*=============================================== Canny Edge Detection ==========================================================*/
 		if (foundface){
 			cropImg(frame);
 			cannyEdge(cropped);
+		/*=============================================== Gabor Filter ==============================================================*/
+			//gaborFilter(cropped);
 		}
 		
 
 		//std::cout <<" data : " << (int)frame.at<uchar>(12,12) << std::endl;
 
+		
+
 
 		/*=============================================== show video ==============================================================*/
 		//cv::flip(frame, output, 1);//mirror output
 		//cv::imshow("camera", frame);
-        if(cv::waitKey(1) >= 0) break;
+		if(cv::waitKey(1) >= 0) break;
+	}
+	}
+	catch( cv::Exception & e){
+		std::cerr << e.msg << std::endl;
 	}
 
 	return 0;
