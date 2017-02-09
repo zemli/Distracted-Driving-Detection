@@ -32,7 +32,7 @@ std::vector<float> err;
 float beta;
 
 //drowsy detection
-std::deque<float> eyeOpenRate (60, 0.9);
+std::deque<float> eyeOpenRate (60, (float)0.9);
 float openRate, sumOpenRate = 54;
 int closeNum = 0;
 
@@ -168,18 +168,22 @@ void wrinkles(){
 	std::cout<< "nasal wrinkles: " << count << std::endl;
 }
 
-void gaborFilter(cv::Mat_<unsigned char> cropped){
-	int kernel_size = 3;
-    double sig = 5, theta = 100, th = 0, lm = 8, gm = 0.02, ps = 0;
-	cv::Mat kernel;
-    cv::Mat src, dest;
-	//src.convertTo(cropped,CV_32F, 1.0/255, 0);
-    kernel = cv::getGaborKernel(cv::Size(kernel_size,kernel_size), sig, theta, lm, gm, ps);
-	cv::filter2D(cropped, dest, CV_32F, kernel);
-	//std::cerr << dest(cv::Rect(30,30,10,10)) << std::endl; // peek into the data
-	imshow("k",kernel);
-	//cv::Mat viz;
-	//dest.convertTo(viz,CV_8U,1.0/255.0);     // move to proper[0..255] range to show it
+void gaborFilter(cv::Mat_<unsigned char> frame){
+	//int kernel_size = 3; double sig = 5, theta = 100, th = 0, lm = 8, gm = 0.02, ps = 0;
+	imshow("frame",frame);
+    cv::Mat in, src, dest;
+	int kernel_size = 31;
+	double sig = 1, theta = 0, lm = 1.0, gm = 0.02, ps = 0;
 
-	//imshow("d",viz);
+	frame.copyTo(in);
+	in.convertTo(src,CV_32F);
+	//cropped.convertTo(src,CV_32F);
+    cv::Mat kernel = cv::getGaborKernel(cv::Size(kernel_size,kernel_size), sig, theta, lm, gm, ps);
+	cv::filter2D(src, dest, CV_32F, kernel);
+	std::cerr << dest(cv::Rect(30,30,10,10)) << std::endl; // peek into the data
+	imshow("k",kernel);
+	cv::Mat viz;
+	dest.convertTo(viz,CV_8U,1.0/255.0);     // move to proper[0..255] range to show it
+
+	imshow("d",viz);
 }

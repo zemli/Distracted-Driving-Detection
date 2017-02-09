@@ -71,7 +71,8 @@ int main(int argc, char** argv){
 			cannyEdge(cropped);
 			wrinkles();
 		/*=============================================== Gabor Filter ==============================================================*/
-			//gaborFilter(cropped);
+			
+			gaborFilter(cropped);
 		}
 		
 
@@ -90,6 +91,7 @@ int main(int argc, char** argv){
 	}
 	catch( cv::Exception & e){
 		std::cerr << e.msg << std::endl;
+		std::cin.get();// pause the console
 	}
 
 	return 0;
